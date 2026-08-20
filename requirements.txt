@@ -4,7 +4,7 @@
 # Backend: API REST
 Django==6.1
 djangorestframework==3.18.0
-django-environ==0.12.0
+django-environ==0.14.0
 django-cors-headers==4.9.0
 
 # Frontend: interfaz web y cliente HTTP contra la API
