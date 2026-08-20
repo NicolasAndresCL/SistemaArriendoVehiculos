@@ -19,3 +19,6 @@ coverage.xml
 
 # Estado de sesión que NiceGUI crea al ejecutarse
 .nicegui/
+
+# Bitácora personal de hitos para portafolio (no es documentación del proyecto)
+memory.md
