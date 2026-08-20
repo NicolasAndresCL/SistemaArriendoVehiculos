@@ -1,0 +1,24 @@
+version: 2
+
+updates:
+  # Dependencias de Python del sistema de arriendo de vehículos.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "dependencias"
+      include: "scope"
+    labels:
+      - "dependencias"
+
+  # Actions usadas en los workflows de CI.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci"

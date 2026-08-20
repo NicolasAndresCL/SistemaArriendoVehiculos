@@ -1,0 +1,100 @@
+/* Hoja de estilos de la interfaz del Sistema de Arriendo de Vehículos.
+   Paleta fija a azul, rojo y blanco por requisito del cliente. */
+
+:root {
+    --azul: #0D3B8C;
+    --azul-claro: #1565C0;
+    --rojo: #C62828;
+    --blanco: #FFFFFF;
+    --texto: #0B2A5B;
+}
+
+body {
+    font-family: "Inter", "Segoe UI", sans-serif;
+    background-color: var(--blanco);
+    color: var(--texto);
+}
+
+/* Corrección de ancho completo: NiceGUI limita el ancho del contenido
+   por defecto; la aplicación necesita ocupar todo el ancho disponible.
+
+   `.q-page-container` queda deliberadamente fuera: Quasar le aplica un
+   `padding-left` igual al ancho del menú lateral, así que forzarle
+   `width: 100%` suma el ancho del menú y desborda la página en horizontal. */
+.nicegui-content,
+.nicegui-sub-pages,
+.q-page {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Ningún contenido ancho —tablas, sobre todo— debe empujar el ancho de la
+   página: el desplazamiento horizontal ocurre dentro del propio elemento.
+
+   `min-width: 0` es la pieza clave. Un ítem de un contenedor flex tiene
+   `min-width: auto` por defecto, de modo que se niega a encogerse por debajo
+   del ancho de su contenido: una tabla ancha estira su tarjeta y esta
+   desborda la página entera. Con `min-width: 0` la tarjeta sí se encoge y el
+   desplazamiento queda dentro de la tabla, donde corresponde. */
+.nicegui-content > *,
+.nicegui-sub-pages > *,
+.nicegui-column,
+.nicegui-row,
+.tarjeta-app {
+    min-width: 0;
+    /* `align-items: stretch` estira el ítem hasta el ancho del contenedor,
+       pero nunca por debajo del ancho de su contenido. `max-width: 100%` es
+       lo que pone el techo y deja el desplazamiento dentro de la tabla. */
+    max-width: 100%;
+}
+
+.q-table__container {
+    max-width: 100%;
+}
+
+.q-table__middle {
+    overflow-x: auto;
+}
+
+.tarjeta-app {
+    background-color: var(--blanco);
+    border: 1px solid rgba(13, 59, 140, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(11, 42, 91, 0.08);
+}
+
+.tarjeta-kpi {
+    background-color: var(--blanco);
+    border: 1px solid rgba(13, 59, 140, 0.25);
+    border-left: 4px solid var(--azul);
+    border-radius: 10px;
+    padding: 12px 16px;
+}
+
+.tarjeta-kpi-adversa {
+    border-left-color: var(--rojo);
+}
+
+.franja-login {
+    background: linear-gradient(135deg, var(--azul) 0%, var(--azul-claro) 100%);
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tarjeta-login {
+    background-color: var(--blanco);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(11, 42, 91, 0.35);
+    padding: 32px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.credenciales-demo {
+    color: rgba(11, 42, 91, 0.6);
+    font-size: 0.75rem;
+    text-align: center;
+}

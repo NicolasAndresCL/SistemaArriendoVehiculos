@@ -1,0 +1,58 @@
+# Configuración de herramientas del proyecto.
+# No declara build-system a propósito: esto es una aplicación, no un paquete
+# distribuible. Las dependencias viven en requirements*.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "*/migrations/*"]
+# `backend/` es una raíz de importación (ver `pythonpath` de pytest): sin esto
+# ruff trataría `apps`, `core` y `config` como paquetes de terceros y los
+# agruparía mal al ordenar los imports.
+src = [".", "backend"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "DJ",  # flake8-django
+    "C4",  # comprehensions
+    "RUF",
+]
+ignore = [
+    "RUF012",  # Django usa atributos de clase mutables por diseño (fields, permission_classes)
+    # El proyecto se escribe en español con tipografía correcta: comillas
+    # angulares, signo de multiplicación, guiones largos. Ruff los reporta como
+    # caracteres "ambiguos" pensando en homoglifos maliciosos; aquí son
+    # deliberados y quitarlos empeoraría el texto.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/config/settings/*.py" = ["F403", "F405"]  # herencia de settings con import *
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["backend"]
+testpaths = ["backend"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["backend"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "backend/manage.py",
+    "backend/config/asgi.py",
+    "backend/config/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]

@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint y formato
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar ruff
+        run: pip install ruff==0.14.4
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+  test:
+    name: Tests y cobertura
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar dependencias de desarrollo
+        run: pip install -r requirements-dev.txt
+
+      # -ra: si algún test apareciera saltado en silencio, queremos verlo en
+      # el log de CI en vez de que pase inadvertido.
+      - name: pytest
+        run: pytest -ra --cov --cov-report=term-missing --cov-fail-under=80
+
+  arranque:
+    name: Arranque del sistema completo
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar dependencias de ejecución
+        run: pip install -r requirements.txt
+
+      - name: Migrar y cargar datos de demostración
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.dev
+          SECRET_KEY: clave-efimera-solo-para-ci
+        run: |
+          python backend/manage.py migrate --noinput
+          python backend/manage.py seed_demo
+
+      - name: Levantar backend y frontend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.dev
+          SECRET_KEY: clave-efimera-solo-para-ci
+        run: |
+          nohup python backend/manage.py runserver 8000 --noreload > backend.log 2>&1 &
+          nohup python frontend/main.py > frontend.log 2>&1 &
+          echo "Procesos lanzados en segundo plano."
+
+      - name: Esperar a que ambos procesos respondan
+        run: |
+          backend_listo=""
+          frontend_listo=""
+          for intento in $(seq 1 20); do
+            if [ -z "$backend_listo" ] && curl --fail --silent --output /dev/null http://127.0.0.1:8000/healthz/; then
+              backend_listo="1"
+            fi
+            if [ -z "$frontend_listo" ] && curl --fail --silent --output /dev/null http://127.0.0.1:8080/; then
+              frontend_listo="1"
+            fi
+            if [ -n "$backend_listo" ] && [ -n "$frontend_listo" ]; then
+              echo "Backend y frontend responden."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Backend o frontend no respondieron en ~40s."
+          echo "---- backend.log ----"
+          cat backend.log || true
+          echo "---- frontend.log ----"
+          cat frontend.log || true
+          exit 1
+
+      - name: Verificar contrato de healthz
+        run: |
+          respuesta="$(curl --fail --silent http://127.0.0.1:8000/healthz/)"
+          echo "$respuesta"
+          echo "$respuesta" | grep -q '"estado":[[:space:]]*"ok"'
+
+      - name: Verificar que el frontend responde
+        run: curl --fail --silent --output /dev/null http://127.0.0.1:8080/
+
+      - name: Verificar login y obtención de token
+        run: |
+          respuesta="$(curl --fail --silent -X POST http://127.0.0.1:8000/api/v1/auth/login/ \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@estacionamiento.cl","password":"1234"}')"
+          echo "$respuesta"
+          echo "$respuesta" | grep -qi 'token'
+
+      - name: Mostrar logs si algún paso anterior falló
+        if: failure()
+        run: |
+          echo "---- backend.log ----"
+          cat backend.log || true
+          echo "---- frontend.log ----"
+          cat frontend.log || true
+
+  deploy-check:
+    name: Hardening de producción
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar dependencias de ejecución
+        run: pip install -r requirements.txt
+
+      # Sin una SECRET_KEY fuerte, `check --deploy` falla por la clave débil
+      # y no por el hardening real, que es lo que este job quiere verificar.
+      - name: check --deploy
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          ALLOWED_HOSTS: arriendos.example.cl
+          SECURE_HTTPS: "True"
+          DATABASE_URL: sqlite:///db-check.sqlite3
+        run: |
+          export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          python backend/manage.py check --deploy --fail-level WARNING

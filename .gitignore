@@ -1,0 +1,21 @@
+# Entorno virtual propio del subproyecto
+.venv/
+
+# Base de datos local: se regenera con migrate + seed_demo
+db.sqlite3
+db.sqlite3-journal
+
+# Secretos
+.env
+
+# Cachés de herramientas
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Estado de sesión que NiceGUI crea al ejecutarse
+.nicegui/

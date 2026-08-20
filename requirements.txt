@@ -1,0 +1,12 @@
+# Dependencias de ejecución — Sistema de Arriendo de Vehículos (IEI-050)
+# Verificadas contra PyPI para Python 3.14.
+
+# Backend: API REST
+Django==6.1
+djangorestframework==3.18.0
+django-environ==0.12.0
+django-cors-headers==4.9.0
+
+# Frontend: interfaz web y cliente HTTP contra la API
+nicegui==3.16.0
+httpx==0.28.1
