@@ -135,7 +135,11 @@ python -m venv .venv
 .\.venv\Scripts\python.exe backend\manage.py seed_demo
 ```
 
-Luego, en **dos terminales**:
+Luego, para levantar backend y frontend con un clic, ejecutar `iniciar.bat` (doble clic o
+`.\iniciar.bat` desde PowerShell). Abre una ventana para cada proceso; cerrar la ventana
+detiene ese proceso.
+
+Alternativamente, en **dos terminales**:
 
 ```powershell
 # Terminal 1 — API
