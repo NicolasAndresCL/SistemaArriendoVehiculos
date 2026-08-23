@@ -31,16 +31,16 @@ VEHICULOS = [
 ]
 
 CLIENTES = [
-    ("tais.montesinos@ejemplo.cl", "18.234.567-8", "Tais", "Montesinos", "+56 9 8123 4567", 900),
+    ("nico.robin@ejemplo.cl", "18.234.567-8", "Nico", "Robin", "+56 9 8123 4567", 900),
     (
-        "joaquin.argandona@ejemplo.cl",
+        "vinsmoke.sanji@ejemplo.cl",
         "19.876.543-2",
-        "Joaquín",
-        "Argandoña",
+        "Vinsmoke",
+        "Sanji",
         "+56 9 7654 3210",
         400,
     ),
-    ("martin.rojas@ejemplo.cl", "17.345.678-9", "Martín", "Rojas", "+56 9 6543 2109", -30),
+    ("trafalgar.law@ejemplo.cl", "17.345.678-9", "Trafalgar", "Law", "+56 9 6543 2109", -30),
 ]
 
 
