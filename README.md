@@ -262,8 +262,13 @@ SistemaArriendoVehiculos/
 ├── frontend/
 │   ├── main.py · api_client.py · theme.py · layout.py
 │   ├── paginas/             login, panel, usuarios, vehiculos, reservas, pagos, devoluciones
-│   └── static/css/app.css
+│   └── static/css/app.css   sistema de diseño (tokens, elevación, componentes)
+├── deploy/k8s/              manifiestos de Kubernetes (Kustomize)
+├── infra/                   Terraform: namespace, config, secretos y volumen
+├── docs/arquitectura.md     diseño y diagramas UML (Mermaid)
 ├── scripts/verificar.ps1
+├── Dockerfile · docker-compose.yml · .dockerignore
+├── Jenkinsfile              pipeline alternativo on-prem
 ├── requirements.txt · requirements-dev.txt · pyproject.toml
 └── .env.example
 ```
@@ -279,5 +284,33 @@ SistemaArriendoVehiculos/
 | Django REST Framework | 3.18.0 |
 | NiceGUI | 3.16.0 |
 | Base de datos | SQLite |
+| Servidor WSGI | gunicorn 23.0.0 (solo en contenedor) |
+| Estáticos | WhiteNoise 6.8.2 (solo en `prod`) |
 | Pruebas | pytest + pytest-django + pytest-cov |
 | Estilo | ruff |
+| Contenedores | Docker (multi-stage) + Compose |
+| Orquestación | Kubernetes + Kustomize |
+| Infraestructura | Terraform (~> 1.9) |
+| CI/CD | GitHub Actions · Jenkins (alternativa on-prem) |
+
+---
+
+## Despliegue en contenedores
+
+```bash
+# Requiere SECRET_KEY y NICEGUI_STORAGE_SECRET en tu .env
+docker compose up --build
+```
+
+Levanta tres servicios: `migraciones` (corre una vez y termina), `backend` y
+`frontend`. A diferencia de `iniciar.bat`, esto comprueba que la **imagen de
+producción** arranca de verdad —con `DEBUG=False`, gunicorn y estáticos
+recolectados—, que es justo lo que el arranque de desarrollo no valida.
+
+Las migraciones van en su propio contenedor y no en el arranque del backend:
+con más de una réplica, varios procesos migrando a la vez sobre la misma base
+chocan entre sí.
+
+Para el clúster, ver [`deploy/k8s/`](deploy/k8s/) y la infraestructura previa en
+[`infra/`](infra/). El diseño y los diagramas UML están en
+[`docs/arquitectura.md`](docs/arquitectura.md).

@@ -22,3 +22,25 @@ coverage.xml
 
 # Bitácora personal de hitos para portafolio (no es documentación del proyecto)
 memory.md
+
+# Registro local de trabajo pendiente (no es documentación del proyecto)
+pendientes.md
+
+# Estáticos recolectados: los genera collectstatic en el despliegue
+staticfiles/
+
+# Base desechable del chequeo de hardening
+db-check.sqlite3
+
+# Terraform: el estado guarda secretos EN CLARO y nunca se versiona.
+# El lock SÍ se versiona (fija las versiones de proveedor), por eso la excepción.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend.hcl
+tfplan
+
+# Artefactos de pruebas con navegador
+.playwright-mcp/
