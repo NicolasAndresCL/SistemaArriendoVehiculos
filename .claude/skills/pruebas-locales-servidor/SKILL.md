@@ -1,6 +1,6 @@
 ---
 name: pruebas-locales-servidor
-description: Reglas para levantar y probar backend (Django, :8000) y frontend (NiceGUI, :8080) de este proyecto en local sin acumular procesos huérfanos. USAR SIEMPRE antes de arrancar el sistema para depurar o probar algo manualmente, y al terminar esa prueba.
+description: Reglas para levantar y probar backend (Django, :8000) y frontend (NiceGUI, :8080) de este proyecto en local sin acumular procesos huérfanos. USAR SIEMPRE antes de arrancar el sistema para depurar o probar algo manualmente, y OBLIGATORIO al terminar esa prueba (matar procesos y borrar archivos temporales, sin excepción).
 ---
 
 # Pruebas locales de backend/frontend en este proyecto
@@ -48,11 +48,28 @@ nada, se reportaba como limpio, y el proceso seguía vivo y sirviendo tráfico.
    (aparece como `pythoncore-...\python.exe` con `multiprocessing.spawn`,
    `parent_pid=<pid del padre>` en su `CommandLine`).
 
-3. **Terminada la prueba, matar los procesos de inmediato** (no dejarlos
-   corriendo "por si acaso"). Si se necesita repetir la prueba pronto, mejor usar
-   puertos distintos a los de desarrollo normal (como hace
-   `scripts/verificar.ps1`, que usa `8901` para el backend en vez de `8000`)
-   en vez de reutilizar el mismo puerto sin confirmar que quedó libre.
+3. **Terminada la prueba, cerrar y eliminar de inmediato — nunca dejarlo
+   corriendo "por si acaso".** Esto es obligatorio, no opcional, y va al final
+   de CADA sesión de prueba, no solo cuando algo salió mal. Checklist mínimo:
+
+   a. Matar backend y frontend (y sus hijos de recarga, ver regla 2):
+      ```powershell
+      Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+          Where-Object { $_.CommandLine -like "*manage.py*" -or $_.CommandLine -like "*frontend*main.py*" } |
+          ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+      ```
+   b. Confirmar con `Get-NetTCPConnection -LocalPort 8080,8000` que no queda
+      ningún `Listen` (solo `TimeWait`/`FinWait2` es aceptable, se cierran solos).
+   c. Borrar los archivos y carpetas que la prueba haya generado y que no sean
+      parte del proyecto: logs (`*.log`, `*.err`), bases de datos desechables
+      (`db-*.sqlite3`), capturas y snapshots de Playwright (`.playwright-mcp/`).
+   d. Correr `git status` y confirmar árbol de trabajo limpio (o solo con los
+      cambios de código que sí correspondía hacer).
+
+   Si se necesita repetir la prueba pronto, mejor usar puertos distintos a los
+   de desarrollo normal (como hace `scripts/verificar.ps1`, que usa `8901` para
+   el backend en vez de `8000`) en vez de reutilizar el mismo puerto sin
+   confirmar que quedó libre.
 
 4. **Nunca usar `nohup ... &` de Bash para levantar backend/frontend cuando la
    verificación final la hace un navegador real (Playwright u otro).** El
