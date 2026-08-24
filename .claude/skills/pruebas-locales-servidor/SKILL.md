@@ -60,10 +60,16 @@ nada, se reportaba como limpio, y el proceso seguía vivo y sirviendo tráfico.
       ```
    b. Confirmar con `Get-NetTCPConnection -LocalPort 8080,8000` que no queda
       ningún `Listen` (solo `TimeWait`/`FinWait2` es aceptable, se cierran solos).
-   c. Borrar los archivos y carpetas que la prueba haya generado y que no sean
+   c. **Cerrar el navegador de Playwright** con `mcp__playwright__browser_close`
+      si se usó para verificar. Es una ventana de Chrome real y visible en la
+      pantalla de Nicolás: si no se cierra, se queda ahí mostrando la página
+      vieja y termina con "Connection lost" cuando se matan los servidores,
+      pareciendo que quedó un servidor corriendo. Matar los procesos de Python
+      NO cierra esta ventana.
+   d. Borrar los archivos y carpetas que la prueba haya generado y que no sean
       parte del proyecto: logs (`*.log`, `*.err`), bases de datos desechables
       (`db-*.sqlite3`), capturas y snapshots de Playwright (`.playwright-mcp/`).
-   d. Correr `git status` y confirmar árbol de trabajo limpio (o solo con los
+   e. Correr `git status` y confirmar árbol de trabajo limpio (o solo con los
       cambios de código que sí correspondía hacer).
 
    Si se necesita repetir la prueba pronto, mejor usar puertos distintos a los
