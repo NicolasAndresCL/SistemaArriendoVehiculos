@@ -163,6 +163,22 @@ a propósito, para que la regla que rechaza esa reserva se pueda ver funcionando
 > La contraseña `1234` es un requisito del enunciado. Los validadores de contraseña de Django
 > están relajados en `dev` y `test` para permitirla, y **completos en `prod`**.
 
+### Regenerar los datos de demostración
+
+`seed_demo` es idempotente: usa `get_or_create`, así que **no modifica los registros que ya
+existen**. Si los datos de demostración cambian en el código (por ejemplo, los nombres de los
+clientes) y tu base ya estaba creada, seguirás viendo los valores antiguos. Para partir de
+cero, borrar la base y volver a generarla:
+
+```powershell
+Remove-Item db.sqlite3
+.\.venv\Scripts\python.exe backend\manage.py migrate
+.\.venv\Scripts\python.exe backend\manage.py seed_demo
+```
+
+`db.sqlite3` no se versiona precisamente por esto: es desechable y se reconstruye con esos
+dos comandos.
+
 ---
 
 ## API
