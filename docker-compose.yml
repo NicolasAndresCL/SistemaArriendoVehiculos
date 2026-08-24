@@ -1,0 +1,83 @@
+# Levanta el sistema completo en contenedores: API, interfaz y la migración
+# previa, con la misma separación de procesos que en producción.
+#
+# Para qué sirve levantar esto (y no `iniciar.bat`): comprueba que la imagen
+# de producción realmente arranca —con `DEBUG=False`, gunicorn y estáticos
+# recolectados—, que es justo lo que el arranque de desarrollo NO valida.
+#
+#   docker compose up --build
+#   → interfaz en http://localhost:8080 · API en http://localhost:8000
+#
+# La base es SQLite sobre un volumen, como pide el enunciado. El código lee
+# `DATABASE_URL` con django-environ, así que migrar a PostgreSQL es cambiar
+# esa variable y añadir un servicio `db`, sin tocar código.
+
+x-imagen-comun: &imagen-comun
+  build:
+    context: .
+  image: sistema-arriendo:local
+  environment:
+    # Falla ruidoso si no está definida, en vez de arrancar con una clave
+    # débil sin que nadie se entere.
+    SECRET_KEY: ${SECRET_KEY:?define SECRET_KEY en tu .env}
+    DATABASE_URL: sqlite:////app/datos/db.sqlite3
+    ALLOWED_HOSTS: localhost,127.0.0.1,backend
+    # Sin TLS delante en local: con SECURE_SSL_REDIRECT activo, el navegador
+    # entra en un bucle infinito de redirecciones a https.
+    SECURE_HTTPS: "False"
+  volumes:
+    - datos:/app/datos
+
+services:
+  # Las migraciones y la recolección de estáticos corren UNA vez, en su propio
+  # contenedor, antes de que arranque nadie más. Meterlas en el arranque del
+  # backend haría que varias réplicas migraran en paralelo sobre la misma base.
+  migraciones:
+    <<: *imagen-comun
+    command: >
+      sh -c "python backend/manage.py migrate --noinput &&
+             python backend/manage.py collectstatic --noinput &&
+             python backend/manage.py seed_demo"
+    restart: "no"
+
+  backend:
+    <<: *imagen-comun
+    depends_on:
+      migraciones:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+
+  frontend:
+    <<: *imagen-comun
+    depends_on:
+      backend:
+        # No basta `depends_on` a secas: si la interfaz arranca antes de que
+        # la API acepte conexiones, el primer ingreso falla con "API
+        # inalcanzable" y parece un bug de la aplicación.
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?define SECRET_KEY en tu .env}
+      DATABASE_URL: sqlite:////app/datos/db.sqlite3
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      SECURE_HTTPS: "False"
+      # La interfaz habla con la API por el nombre del servicio en la red
+      # interna de Compose, no por localhost.
+      API_BASE_URL: http://backend:8000/api/v1
+      NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET:?define NICEGUI_STORAGE_SECRET en tu .env}
+    command: ["python", "frontend/main.py"]
+    ports:
+      - "8080:8080"
+    # Para la interfaz, "sano" es servir su propia página: el healthcheck de
+    # la imagen apunta a /healthz/ del backend, que aquí no corresponde.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  # Volumen nombrado, no bind-mount del host: la base no debe depender de la
+  # ruta ni de los permisos del sistema de archivos de quien levanta esto.
+  datos:

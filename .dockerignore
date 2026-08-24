@@ -1,0 +1,48 @@
+# Reduce el contexto de build y evita que secretos o basura entren en una capa
+# de la imagen. Todo lo que no haga falta para CONSTRUIR o EJECUTAR, fuera.
+
+# Secretos: nunca deben quedar registrados en una capa.
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales del host: la imagen instala los suyos.
+.venv/
+env/
+venv/
+
+# Control de versiones y metadatos de CI.
+.git/
+.gitignore
+.github/
+.claude/
+
+# Cachés de herramientas.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Base de datos local: la del contenedor vive en un volumen.
+*.sqlite3
+*.sqlite3-journal
+
+# Artefactos de recolección y de ejecución.
+staticfiles/
+media/
+.nicegui/
+
+# Scripts y documentación que no se ejecutan dentro del contenedor.
+scripts/
+docs/
+iniciar.bat
+memory.md
+pendientes.md
+*.md
+!README.md
+
+# Artefactos de pruebas con navegador.
+.playwright-mcp/

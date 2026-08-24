@@ -10,3 +10,10 @@ django-cors-headers==4.9.0
 # Frontend: interfaz web y cliente HTTP contra la API
 nicegui==3.16.0
 httpx==0.28.1
+
+# Producción: servidor WSGI y servido de estáticos.
+# Viven aquí y no en un requirements-prod.txt aparte porque el job
+# `deploy-check` del CI instala este archivo y `config.settings.prod` importa
+# WhiteNoise: separarlos rompería la verificación de hardening.
+gunicorn==23.0.0
+whitenoise==6.8.2

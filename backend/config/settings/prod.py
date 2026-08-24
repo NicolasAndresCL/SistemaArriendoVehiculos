@@ -28,4 +28,21 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
 
+# WhiteNoise sirve los estáticos desde el propio proceso: en un contenedor no
+# hay Nginx delante, y con DEBUG=False Django deja de servirlos por su cuenta.
+# Va inmediatamente después de SecurityMiddleware, como exige su documentación.
+MIDDLEWARE = MIDDLEWARE.copy()
+MIDDLEWARE.insert(
+    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+)
+
+# Se declara completo y no con `**STORAGES`: los valores por defecto de Django
+# viven en `global_settings`, no en `base.py`, así que no llegan por el
+# `import *` y expandirlos daría NameError.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
+
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
