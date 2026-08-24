@@ -1,0 +1,101 @@
+# API Django del Sistema de Arriendo de Vehículos.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels: { app: arriendos, componente: backend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: arriendos, componente: backend }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      # 0 disponibilidad perdida durante el despliegue, a costa de un pod
+      # extra temporal.
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels: { app: arriendos, componente: backend }
+    spec:
+      # La aplicación no llama a la API de Kubernetes: no necesita el token.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001          # el UID que crea el Dockerfile
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      # Da tiempo a cerrar las peticiones en curso al recibir SIGTERM.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: backend
+          # Tag inmutable, nunca `latest`: el CI lo reemplaza por el SHA del
+          # commit. Con `latest`, un pod reiniciado podría bajar una imagen
+          # distinta a la de sus compañeros y nadie sabría qué corre.
+          image: sistema-arriendo:REEMPLAZAR_POR_SHA
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: arriendos-config }
+            - secretRef: { name: arriendos-secretos }
+          # readiness: ¿puede atender tráfico AHORA? Si falla, se le quita del
+          # Service pero se le deja vivo.
+          readinessProbe:
+            httpGet: { path: /healthz/, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          # liveness: ¿está colgado sin remedio? Si falla, se REINICIA el pod.
+          # Apunta al mismo endpoint pero con umbrales mucho más laxos: una
+          # liveness sensible a la base de datos reiniciaría todas las réplicas
+          # a la vez cuando el problema no es de ellas.
+          livenessProbe:
+            httpGet: { path: /healthz/, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            # requests: lo que el planificador reserva para decidir dónde cabe.
+            requests: { cpu: 100m, memory: 192Mi }
+            # Límite de memoria siempre (una fuga muere acotada en vez de
+            # llevarse el nodo). Sin límite de CPU a propósito: estrangula y
+            # produce latencias difíciles de diagnosticar.
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: datos, mountPath: /app/datos }
+      volumes:
+        # Con readOnlyRootFilesystem, todo lo que se escriba necesita su propio
+        # volumen declarado.
+        - name: tmp
+          emptyDir: {}
+        - name: datos
+          persistentVolumeClaim: { claimName: arriendos-datos }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels: { app: arriendos, componente: backend }
+spec:
+  type: ClusterIP
+  selector: { app: arriendos, componente: backend }
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+# Impide que un drenaje de nodo se lleve todas las réplicas a la vez.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: arriendos, componente: backend }

@@ -1,0 +1,33 @@
+# Entrada pública: solo la interfaz se expone. La API queda accesible dentro
+# del clúster (ClusterIP + NetworkPolicy) porque su único cliente es el
+# frontend; publicarla también ampliaría la superficie sin necesidad.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: arriendos
+  annotations:
+    # NiceGUI mantiene una conexión WebSocket permanente con el navegador: sin
+    # un timeout largo, el proxy la corta y la interfaz muestra
+    # "Connection lost. Trying to reconnect..." cada pocos minutos.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Sesión pegajosa: con varias réplicas, el WebSocket debe volver siempre al
+    # mismo pod que tiene el estado de esa sesión.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "arriendos-afinidad"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["arriendos.example.cl"]
+      secretName: arriendos-tls
+  rules:
+    - host: arriendos.example.cl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8080

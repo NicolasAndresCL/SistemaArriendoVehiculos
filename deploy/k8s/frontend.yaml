@@ -1,0 +1,82 @@
+# Interfaz NiceGUI del Sistema de Arriendo de Vehículos.
+#
+# Consume la API por HTTP igual que cualquier otro cliente: nunca toca la base
+# de datos, por eso no monta el volumen de datos.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels: { app: arriendos, componente: frontend }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: arriendos, componente: frontend }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: arriendos, componente: frontend }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: frontend
+          image: sistema-arriendo:REEMPLAZAR_POR_SHA
+          imagePullPolicy: IfNotPresent
+          command: ["python", "frontend/main.py"]
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: arriendos-config }
+            - secretRef: { name: arriendos-secretos }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            # NiceGUI escribe estado de sesión en .nicegui/ junto al código.
+            - { name: estado-nicegui, mountPath: /app/.nicegui }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: estado-nicegui
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels: { app: arriendos, componente: frontend }
+spec:
+  type: ClusterIP
+  selector: { app: arriendos, componente: frontend }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: arriendos, componente: frontend }

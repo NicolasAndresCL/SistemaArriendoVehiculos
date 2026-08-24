@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arriendos
+  labels:
+    # Pod Security Admission en modo `restricted`: reemplazó a las
+    # PodSecurityPolicy, eliminadas en Kubernetes 1.25. Rechaza pods que
+    # corran como root, que escalen privilegios o que pidan capabilities.
+    # `warn` y `audit` además avisan en vez de fallar en silencio.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

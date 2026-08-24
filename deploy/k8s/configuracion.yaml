@@ -1,0 +1,115 @@
+# Configuración, almacenamiento y migraciones.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arriendos-config
+data:
+  DJANGO_SETTINGS_MODULE: config.settings.prod
+  DATABASE_URL: sqlite:////app/datos/db.sqlite3
+  ALLOWED_HOSTS: arriendos.example.cl,backend
+  CSRF_TRUSTED_ORIGINS: https://arriendos.example.cl
+  SECURE_HTTPS: "True"
+  # La interfaz llega a la API por el nombre del Service, no por localhost:
+  # son pods distintos.
+  API_BASE_URL: http://backend:8000/api/v1
+---
+# ADVERTENCIA: este archivo NO contiene secretos reales y no debe contenerlos.
+#
+# Un Secret de Kubernetes es base64, que es codificación y no cifrado:
+# cualquiera con permiso de lectura sobre el namespace lo ve en claro. En un
+# despliegue real, este objeto lo genera External Secrets Operator desde el
+# gestor de secretos del proveedor, o se versiona como SealedSecret (cifrado
+# asimétrico). Se deja declarado para que el contrato de variables quede
+# explícito.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: arriendos-secretos
+type: Opaque
+stringData:
+  SECRET_KEY: "REEMPLAZAR-desde-el-gestor-de-secretos"
+  NICEGUI_STORAGE_SECRET: "REEMPLAZAR-desde-el-gestor-de-secretos"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arriendos-datos
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Migraciones como Job propio, no en el arranque de cada réplica: con dos pods
+# de backend, ambos correrían `migrate` a la vez sobre la misma base.
+# El pipeline espera a que este Job termine antes de rotar los Deployments.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migraciones
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: migraciones
+          image: sistema-arriendo:REEMPLAZAR_POR_SHA
+          command:
+            - sh
+            - -c
+            - |
+              python backend/manage.py migrate --noinput
+              python backend/manage.py collectstatic --noinput
+          envFrom:
+            - configMapRef: { name: arriendos-config }
+            - secretRef: { name: arriendos-secretos }
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: datos, mountPath: /app/datos }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: datos
+          persistentVolumeClaim: { claimName: arriendos-datos }
+---
+# Deniega todo el tráfico entrante por defecto. Sin esto, cualquier pod
+# comprometido del clúster llega directo a la API y a los datos.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: denegar-entrada-por-defecto
+spec:
+  podSelector:
+    matchLabels: { app: arriendos }
+  policyTypes: ["Ingress"]
+---
+# Y se abre solo lo necesario: la interfaz habla con la API; el Ingress habla
+# con la interfaz.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: permitir-frontend-a-backend
+spec:
+  podSelector:
+    matchLabels: { app: arriendos, componente: backend }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: arriendos, componente: frontend }
+      ports:
+        - { protocol: TCP, port: 8000 }

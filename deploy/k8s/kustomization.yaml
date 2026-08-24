@@ -1,0 +1,28 @@
+# Kustomize agrupa los manifiestos y permite que el pipeline fije el tag de la
+# imagen sin editar los YAML a mano:
+#
+#   kubectl kustomize deploy/k8s/                 # revisar lo que se aplicará
+#   kubectl apply -k deploy/k8s/                  # aplicar
+#   kustomize edit set image sistema-arriendo=registro/sistema-arriendo:<sha>
+#
+# Nunca `kubectl edit` sobre el clúster: lo que no está en este repo no existe.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: arriendos
+
+resources:
+  - namespace.yaml
+  - configuracion.yaml
+  - backend.yaml
+  - frontend.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: sistema-arriendo
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: sistema-arriendo
+    newTag: REEMPLAZAR_POR_SHA
