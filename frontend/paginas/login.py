@@ -52,12 +52,11 @@ def pagina_login() -> None:
 
     with ui.column().classes("franja-login"):
         with ui.card().classes("tarjeta-login items-stretch"):
-            with ui.column().classes("items-center w-full gap-1 q-mb-md"):
-                ui.icon("directions_car", size="40px", color="primary")
-                ui.label("Sistema de Arriendo de Vehículos").classes(
-                    "text-lg font-semibold text-center"
-                )
-                ui.label("Inicie sesión para continuar").classes("text-caption text-center")
+            with ui.column().classes("items-center w-full gap-2 q-mb-lg"):
+                with ui.element("div").classes("logo-login"):
+                    ui.icon("directions_car").props("size=28px")
+                ui.label("Sistema de Arriendo de Vehículos").classes("titulo-login")
+                ui.label("Inicie sesión para continuar").classes("subtitulo-login")
 
             campo_email = (
                 ui.input("Correo electrónico")
@@ -75,9 +74,13 @@ def pagina_login() -> None:
             )
             campo_password.on("keydown.enter", enviar)
 
-            boton_ingresar = ui.button("Ingresar", on_click=enviar).classes("w-full q-mt-sm")
+            boton_ingresar = (
+                ui.button("Ingresar", on_click=enviar)
+                .props("unelevated size=md")
+                .classes("w-full q-mt-md")
+            )
 
             ui.separator().classes("q-my-md")
-            with ui.column().classes("w-full gap-0 credenciales-demo"):
-                ui.label("Credenciales de demostración:")
-                ui.label("admin@estacionamiento.cl / 1234")
+            with ui.column().classes("w-full gap-1 credenciales-demo items-center"):
+                ui.label("Credenciales de demostración")
+                ui.label("admin@estacionamiento.cl / 1234").classes("credencial")

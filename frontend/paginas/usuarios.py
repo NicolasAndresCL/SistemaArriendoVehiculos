@@ -86,7 +86,7 @@ class EstadoUsuarios:
 async def pagina_usuarios() -> None:
     """Construye la página de administración de usuarios."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/usuarios")
 
     estado = EstadoUsuarios()
 

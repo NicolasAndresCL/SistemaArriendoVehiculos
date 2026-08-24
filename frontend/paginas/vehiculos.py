@@ -115,7 +115,7 @@ class EstadoVehiculos:
 async def pagina_vehiculos() -> None:
     """Construye la página de administración de vehículos."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/vehiculos")
 
     estado = EstadoVehiculos()
 

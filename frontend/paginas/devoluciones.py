@@ -87,7 +87,7 @@ class EstadoDevoluciones:
 async def pagina_devoluciones(args: PageArguments) -> None:
     """Construye la página de registro de devoluciones."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/devoluciones")
 
     estado = EstadoDevoluciones()
 

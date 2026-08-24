@@ -25,7 +25,7 @@ class EstadoPanel:
 async def pagina_panel() -> None:
     """Construye el panel principal con KPIs y tablas resumen."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/")
 
     with ui.column().classes("w-full items-center q-pa-xl") as contenedor_carga:
         ui.spinner(size="lg", color="primary")
@@ -52,24 +52,28 @@ async def pagina_panel() -> None:
     pendientes = sum(1 for r in estado.reservas if r["estado"] == "PENDIENTE")
     ingresos = sum(float(p["monto"]) for p in estado.pagos if p["estado"] == "PAGADO")
 
+    # El ícono refuerza el significado del KPI sin obligar a leer el rótulo;
+    # la bandera `adversa` es lo único que autoriza el uso del rojo.
     tarjetas_kpi = [
-        ("Vehículos disponibles", str(disponibles), False),
-        ("Vehículos arrendados", str(arrendados), False),
-        ("En mantenimiento", str(mantenimiento), mantenimiento > 0),
-        ("Reservas activas", str(activas), False),
-        ("Pendientes de pago", str(pendientes), pendientes > 0),
-        ("Ingresos totales", formatear_clp(ingresos), False),
+        ("Vehículos disponibles", str(disponibles), "check_circle", False),
+        ("Vehículos arrendados", str(arrendados), "directions_car", False),
+        ("En mantenimiento", str(mantenimiento), "build", mantenimiento > 0),
+        ("Reservas activas", str(activas), "event_available", False),
+        ("Pendientes de pago", str(pendientes), "schedule", pendientes > 0),
+        ("Ingresos totales", formatear_clp(ingresos), "payments", False),
     ]
-    with ui.row().classes("w-full gap-4 q-pa-md"):
-        for titulo, valor, adversa in tarjetas_kpi:
+    with ui.row().classes("w-full gap-3 q-pa-md"):
+        for titulo, valor, icono, adversa in tarjetas_kpi:
             clases = "tarjeta-kpi col-grow" + (" tarjeta-kpi-adversa" if adversa else "")
-            with ui.column().classes(clases):
-                ui.label(titulo).classes("text-caption")
-                ui.label(valor).classes("text-h6 text-weight-bold")
+            with ui.column().classes(clases + " gap-1"):
+                with ui.row().classes("items-center justify-between w-full no-wrap"):
+                    ui.label(titulo).classes("rotulo")
+                    ui.icon(icono).classes("icono-kpi").props("size=18px")
+                ui.label(valor).classes("valor")
 
     with ui.row().classes("w-full gap-4 q-px-md q-pb-md items-start"):
         with ui.column().classes("tarjeta-app col q-pa-md"):
-            ui.label("Últimas reservas").classes("text-subtitle1 text-weight-medium q-mb-sm")
+            ui.label("Últimas reservas").classes("titulo-seccion q-mb-sm")
             filas_reservas = [
                 {
                     "id": r.get("id"),
@@ -96,7 +100,7 @@ async def pagina_panel() -> None:
             ).classes("w-full")
 
         with ui.column().classes("tarjeta-app col q-pa-md"):
-            ui.label("Vehículos por estado").classes("text-subtitle1 text-weight-medium q-mb-sm")
+            ui.label("Vehículos por estado").classes("titulo-seccion q-mb-sm")
             filas_vehiculos = [
                 {
                     "id": v.get("id"),

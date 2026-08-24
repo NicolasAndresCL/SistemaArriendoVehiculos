@@ -91,7 +91,7 @@ class EstadoReservas:
 async def pagina_reservas() -> None:
     """Construye la página de administración de reservas."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/reservas")
 
     estado = EstadoReservas()
 

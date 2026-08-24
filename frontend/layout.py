@@ -39,6 +39,11 @@ class AppLayout:
         self.header = None
         self.drawer = None
         self.etiqueta_usuario = None
+        self.avatar = None
+        # Ítems del menú indexados por ruta, para poder marcar el activo sin
+        # reconstruir el drawer en cada navegación.
+        self.items_navegacion: dict[str, ui.item] = {}
+        self.ruta_activa = ""
         self.sesion = EstadoSesion()
 
     @classmethod
@@ -52,37 +57,59 @@ class AppLayout:
         """Crea header y drawer. Debe llamarse una sola vez, en la página raíz."""
         with ui.header().classes("items-center justify-between") as encabezado:
             self.header = encabezado
-            with ui.row().classes("items-center gap-2"):
-                ui.icon("directions_car", size="28px")
-                ui.label("Sistema de Arriendo de Vehículos").classes("text-lg font-semibold")
-            with ui.row().classes("items-center gap-4"):
-                self.etiqueta_usuario = ui.label("")
+            with ui.row().classes("items-center gap-3"):
+                ui.icon("directions_car", size="26px")
+                ui.label("Sistema de Arriendo de Vehículos").classes(
+                    "text-base font-semibold marca-app"
+                )
+            with ui.row().classes("items-center gap-3"):
+                # Avatar con iniciales: identifica la sesión de un vistazo sin
+                # depender solo del nombre, que se trunca en pantallas angostas.
+                self.avatar = ui.label("").classes("avatar-sesion")
+                self.etiqueta_usuario = ui.label("").classes("usuario-sesion")
                 ui.button(icon="logout", on_click=self._cerrar_sesion).props(
-                    "flat round color=white"
+                    "flat round dense color=white"
                 ).tooltip("Cerrar sesión")
 
-        with ui.left_drawer().classes("bg-primary text-white") as barra_lateral:
+        with ui.left_drawer().classes("text-white") as barra_lateral:
             self.drawer = barra_lateral
+            ui.label("Gestión").classes("nav-seccion")
             with ui.list().props("padding").classes("w-full"):
                 for ruta, etiqueta, icono in ELEMENTOS_NAVEGACION:
                     # `partial` y no una lambda con argumento por defecto: el
                     # elemento clicable es el `ui.item` completo, de modo que
                     # el clic sobre el ícono o sobre el texto navega igual.
-                    with ui.item(on_click=partial(ui.navigate.to, ruta)).classes("rounded-borders"):
+                    with ui.item(on_click=partial(ui.navigate.to, ruta)).classes(
+                        "nav-item"
+                    ) as elemento:
+                        self.items_navegacion[ruta] = elemento
                         with ui.item_section().props("avatar"):
-                            ui.icon(icono, color="white")
+                            ui.icon(icono, color="white").props("size=20px")
                         with ui.item_section():
-                            ui.label(etiqueta)
+                            ui.label(etiqueta).classes("text-sm")
 
         self.show()
 
-    def show(self) -> None:
+    def marcar_activo(self, ruta: str) -> None:
+        """Resalta en el menú la sección que se está viendo."""
+        self.ruta_activa = ruta
+        for ruta_item, elemento in self.items_navegacion.items():
+            if ruta_item == ruta:
+                elemento.classes(add="nav-item-activo")
+            else:
+                elemento.classes(remove="nav-item-activo")
+
+    def show(self, ruta_activa: str | None = None) -> None:
         """Muestra header y drawer y refresca el nombre del usuario conectado."""
         usuario = app.storage.user.get("usuario") or {}
         self.sesion.nombre = usuario.get("nombre_completo") or usuario.get("email", "")
         self.sesion.email = usuario.get("email", "")
         if self.etiqueta_usuario is not None:
             self.etiqueta_usuario.set_text(self.sesion.nombre)
+        if self.avatar is not None:
+            self.avatar.set_text(_iniciales(self.sesion.nombre))
+        if ruta_activa is not None:
+            self.marcar_activo(ruta_activa)
         if self.header is not None:
             self.header.set_visibility(True)
         if self.drawer is not None:
@@ -108,6 +135,16 @@ class AppLayout:
         app.storage.user.pop("token", None)
         app.storage.user.pop("usuario", None)
         ui.navigate.to("/login")
+
+
+def _iniciales(nombre: str) -> str:
+    """Devuelve hasta dos iniciales en mayúscula para el avatar de la cabecera."""
+    partes = [parte for parte in nombre.split() if parte]
+    if not partes:
+        return "?"
+    if len(partes) == 1:
+        return partes[0][:2].upper()
+    return (partes[0][0] + partes[-1][0]).upper()
 
 
 def hay_sesion_activa() -> bool:

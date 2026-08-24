@@ -67,7 +67,7 @@ def _obtener_reserva_de_query(args: PageArguments) -> str | None:
 async def pagina_pagos(args: PageArguments) -> None:
     """Construye la página de registro de pagos."""
     aplicar_tema()
-    AppLayout.current().show()
+    AppLayout.current().show(ruta_activa="/pagos")
 
     estado = EstadoPagos()
 

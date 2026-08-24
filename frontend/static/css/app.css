@@ -1,22 +1,130 @@
-/* Hoja de estilos de la interfaz del Sistema de Arriendo de Vehículos.
-   Paleta fija a azul, rojo y blanco por requisito del cliente. */
+/* Sistema de diseño del Sistema de Arriendo de Vehículos.
+
+   Paleta fija a azul, rojo y blanco por requisito del cliente; sin modo
+   oscuro. El rojo se reserva para acciones destructivas y errores: usarlo
+   como color decorativo le quita fuerza justo donde importa.
+
+   La hoja se organiza en capas: primero los tokens, luego las correcciones
+   estructurales de NiceGUI/Quasar, y al final los componentes. */
+
+/* ============================================================ 1. TOKENS */
 
 :root {
+    /* --- Marca (fijos por requisito) --- */
     --azul: #0D3B8C;
     --azul-claro: #1565C0;
     --rojo: #C62828;
     --blanco: #FFFFFF;
     --texto: #0B2A5B;
+
+    /* --- Derivados de marca ---
+       Tintes del azul para fondos y bordes. Se declaran como tokens para no
+       repetir rgba() sueltos por la hoja: cambiar la opacidad de todos los
+       bordes debe ser una edición, no veinte. */
+    --azul-900: #08265C;
+    --azul-700: #0D3B8C;
+    --azul-500: #1565C0;
+    --azul-100: rgba(21, 101, 192, 0.10);
+    --azul-050: rgba(21, 101, 192, 0.05);
+
+    --borde: rgba(13, 59, 140, 0.14);
+    --borde-fuerte: rgba(13, 59, 140, 0.24);
+
+    /* --- Texto: jerarquía por opacidad sobre un solo color ---
+       Tres niveles bastan. Más niveles no se distinguen y se usan mal. */
+    --texto-fuerte: #0B2A5B;
+    --texto-medio: rgba(11, 42, 91, 0.72);
+    --texto-suave: rgba(11, 42, 91, 0.52);
+
+    --rojo-100: rgba(198, 40, 40, 0.10);
+
+    /* --- Escala de espaciado (base 4px) ---
+       Una escala fija evita el "16px aquí, 15px allá" que hace que una
+       interfaz se vea artesanal en vez de sistemática. */
+    --sp-1: 0.25rem;
+    --sp-2: 0.5rem;
+    --sp-3: 0.75rem;
+    --sp-4: 1rem;
+    --sp-5: 1.5rem;
+    --sp-6: 2rem;
+
+    /* --- Radios --- */
+    --radio-sm: 6px;
+    --radio-md: 10px;
+    --radio-lg: 14px;
+
+    /* --- Elevación ---
+       Sombras de dos capas (uno corto y denso, otro largo y difuso): una sola
+       sombra plana se ve como un borde gris, no como profundidad. */
+    --sombra-1: 0 1px 2px rgba(11, 42, 91, 0.06), 0 1px 3px rgba(11, 42, 91, 0.05);
+    --sombra-2: 0 2px 4px rgba(11, 42, 91, 0.06), 0 4px 12px rgba(11, 42, 91, 0.08);
+    --sombra-3: 0 8px 16px rgba(11, 42, 91, 0.10), 0 16px 40px rgba(11, 42, 91, 0.16);
+
+    /* --- Movimiento ---
+       Corto y con easing de salida: la interfaz debe sentirse inmediata.
+       Cualquier transición sobre 200ms en una tabla se percibe como lentitud. */
+    --transicion: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Respeta a quien pidió menos animación en su sistema operativo. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ====================================================== 2. BASE Y TEXTO */
 
 body {
-    font-family: "Inter", "Segoe UI", sans-serif;
-    background-color: var(--blanco);
-    color: var(--texto);
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    background-color: #F5F7FB;   /* lienzo gris azulado: las tarjetas blancas
+                                    necesitan un fondo que no sea blanco para
+                                    que la elevación se lea */
+    color: var(--texto-fuerte);
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Corrección de ancho completo: NiceGUI limita el ancho del contenido
-   por defecto; la aplicación necesita ocupar todo el ancho disponible.
+/* Cifras tabulares en KPIs y tablas: sin esto las columnas de montos bailan
+   al cambiar de valor, porque cada dígito tiene ancho distinto. */
+.cifra,
+.tarjeta-kpi .valor,
+.q-table td {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Foco visible y consistente. Quasar lo atenúa en varios componentes; para
+   quien navega con teclado, perder el foco es perder la orientación. */
+:focus-visible {
+    outline: 2px solid var(--azul-500);
+    outline-offset: 2px;
+    border-radius: var(--radio-sm);
+}
+
+/* Barra de desplazamiento discreta, en el tono de la marca. */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(13, 59, 140, 0.22);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(13, 59, 140, 0.38);
+    background-clip: content-box;
+}
+
+/* ======================================= 3. CORRECCIONES ESTRUCTURALES */
+
+/* Ancho completo: NiceGUI limita el ancho del contenido por defecto.
 
    `.q-page-container` queda deliberadamente fuera: Quasar le aplica un
    `padding-left` igual al ancho del menú lateral, así que forzarle
@@ -48,53 +156,362 @@ body {
     max-width: 100%;
 }
 
+/* ============================================ 4. CABECERA Y MENÚ LATERAL */
+
+.q-header {
+    background: linear-gradient(90deg, var(--azul-900) 0%, var(--azul-700) 100%);
+    box-shadow: var(--sombra-2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.marca-app {
+    letter-spacing: -0.01em;
+}
+
+/* Identidad del usuario en la cabecera: el nombre es dato secundario, no
+   debe competir con el título del sistema. */
+.usuario-sesion {
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.avatar-sesion {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--blanco);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.q-drawer {
+    background: var(--azul-900) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Ítems de navegación: reposo discreto, hover perceptible, activo inequívoco.
+   La barra izquierda del estado activo es lo que permite ubicarse de un
+   vistazo sin leer. */
+.nav-item {
+    border-radius: var(--radio-sm);
+    margin: 2px var(--sp-2);
+    padding-top: var(--sp-2);
+    padding-bottom: var(--sp-2);
+    color: rgba(255, 255, 255, 0.78);
+    position: relative;
+    transition: background-color var(--transicion), color var(--transicion);
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: var(--blanco);
+}
+
+.nav-item .q-item__section--avatar {
+    min-width: 34px;
+}
+
+.nav-item-activo {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--blanco);
+    font-weight: 600;
+}
+
+.nav-item-activo::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 18%;
+    height: 64%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--blanco);
+}
+
+/* Rótulo que agrupa la navegación: orienta sin ocupar espacio visual. */
+.nav-seccion {
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: var(--sp-4) var(--sp-4) var(--sp-2);
+}
+
+/* ========================================================= 5. TARJETAS */
+
+.tarjeta-app {
+    background-color: var(--blanco);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-lg);
+    box-shadow: var(--sombra-1);
+}
+
+.titulo-seccion {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--texto-fuerte);
+    letter-spacing: -0.01em;
+}
+
+/* --- Tarjetas KPI ---
+   Jerarquía invertida a propósito: el número manda, el rótulo lo explica.
+   Un KPI donde ambos pesan igual obliga a leer para encontrar el dato. */
+.tarjeta-kpi {
+    background-color: var(--blanco);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-md);
+    padding: var(--sp-4);
+    box-shadow: var(--sombra-1);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow var(--transicion), transform var(--transicion);
+}
+
+/* Acento superior en vez de borde izquierdo: no descuadra el texto y funciona
+   igual cuando las tarjetas se apilan en pantallas angostas. */
+.tarjeta-kpi::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--azul-700), var(--azul-500));
+}
+
+.tarjeta-kpi:hover {
+    box-shadow: var(--sombra-2);
+    transform: translateY(-1px);
+}
+
+.tarjeta-kpi .rotulo {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--texto-suave);
+    letter-spacing: 0.01em;
+}
+
+.tarjeta-kpi .valor {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--texto-fuerte);
+    letter-spacing: -0.02em;
+}
+
+.tarjeta-kpi .icono-kpi {
+    color: var(--azul-500);
+    opacity: 0.85;
+}
+
+/* Variante adversa: rojo solo cuando el número exige atención. */
+.tarjeta-kpi-adversa::before {
+    background: var(--rojo);
+}
+
+.tarjeta-kpi-adversa .valor {
+    color: var(--rojo);
+}
+
+.tarjeta-kpi-adversa .icono-kpi {
+    color: var(--rojo);
+}
+
+/* =========================================================== 6. TABLAS */
+
 .q-table__container {
     max-width: 100%;
+    border-radius: var(--radio-md);
 }
 
 .q-table__middle {
     overflow-x: auto;
 }
 
-.tarjeta-app {
-    background-color: var(--blanco);
-    border: 1px solid rgba(13, 59, 140, 0.25);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(11, 42, 91, 0.08);
+/* Cabecera: mayúsculas pequeñas y color atenuado. Debe leerse como etiqueta
+   de columna, no competir con los datos. */
+.q-table thead th {
+    background: var(--azul-050);
+    color: var(--texto-medio);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--borde);
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
-.tarjeta-kpi {
-    background-color: var(--blanco);
-    border: 1px solid rgba(13, 59, 140, 0.25);
-    border-left: 4px solid var(--azul);
-    border-radius: 10px;
-    padding: 12px 16px;
+.q-table tbody td {
+    font-size: 0.8125rem;
+    color: var(--texto-fuerte);
+    border-bottom: 1px solid rgba(13, 59, 140, 0.07);
 }
 
-.tarjeta-kpi-adversa {
-    border-left-color: var(--rojo);
+/* Realce de fila: ayuda a seguir la línea en tablas anchas sin necesidad de
+   cebra, que ensucia cuando además hay chips de color. */
+.q-table tbody tr {
+    transition: background-color var(--transicion);
 }
+
+.q-table tbody tr:hover {
+    background: var(--azul-050);
+}
+
+.q-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ==================================================== 7. CHIPS DE ESTADO */
+
+.chip-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.chip-neutro {
+    background: var(--azul-100);
+    color: var(--azul-700);
+}
+
+.chip-adverso {
+    background: var(--rojo-100);
+    color: var(--rojo);
+}
+
+/* ========================================================= 8. CONTROLES */
+
+/* Los botones de Quasar vienen en MAYÚSCULAS por defecto; en español, con
+   tildes, se leen peor y ocupan más. */
+.q-btn {
+    text-transform: none;
+    font-weight: 600;
+    letter-spacing: 0;
+    border-radius: var(--radio-sm);
+}
+
+.q-btn--standard {
+    box-shadow: var(--sombra-1);
+}
+
+/* Botón de acción destructiva: rojo, y solo aquí. */
+.boton-peligro {
+    color: var(--rojo) !important;
+}
+
+/* =========================================================== 9. LOGIN */
 
 .franja-login {
-    background: linear-gradient(135deg, var(--azul) 0%, var(--azul-claro) 100%);
+    background:
+        radial-gradient(1200px 500px at 15% -10%, rgba(21, 101, 192, 0.55), transparent 60%),
+        linear-gradient(135deg, var(--azul-900) 0%, var(--azul-700) 55%, var(--azul-500) 100%);
     min-height: 100vh;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: var(--sp-4);
 }
 
 .tarjeta-login {
     background-color: var(--blanco);
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(11, 42, 91, 0.35);
-    padding: 32px;
+    border-radius: var(--radio-lg);
+    box-shadow: var(--sombra-3);
+    padding: var(--sp-6);
     width: 100%;
     max-width: 400px;
 }
 
+.logo-login {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radio-md);
+    background: linear-gradient(135deg, var(--azul-700), var(--azul-500));
+    color: var(--blanco);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--sombra-2);
+}
+
+.titulo-login {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--texto-fuerte);
+    text-align: center;
+}
+
+.subtitulo-login {
+    font-size: 0.8125rem;
+    color: var(--texto-suave);
+    text-align: center;
+}
+
+/* Bloque de credenciales de demostración: informativo, claramente secundario
+   y visiblemente "de prueba" para que nadie lo confunda con un aviso real. */
 .credenciales-demo {
-    color: rgba(11, 42, 91, 0.6);
+    color: var(--texto-suave);
     font-size: 0.75rem;
     text-align: center;
+    background: var(--azul-050);
+    border: 1px dashed var(--borde-fuerte);
+    border-radius: var(--radio-sm);
+    padding: var(--sp-2) var(--sp-3);
+}
+
+.credenciales-demo .credencial {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    color: var(--azul-700);
+    font-weight: 600;
+}
+
+/* ==================================================== 10. ESTADOS VACÍOS */
+
+/* Una tabla vacía sin explicación parece un error de carga. */
+.estado-vacio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-6) var(--sp-4);
+    color: var(--texto-suave);
+    text-align: center;
+}
+
+.estado-vacio .icono {
+    color: rgba(13, 59, 140, 0.28);
+}
+
+/* ==================================================== 11. RESPONSIVIDAD */
+
+/* Por debajo de ~1024px las seis tarjetas KPI en una fila quedan ilegibles:
+   se dejan crecer y envolver en vez de comprimirse. */
+@media (max-width: 1024px) {
+    .tarjeta-kpi {
+        flex: 1 1 160px;
+    }
+
+    .tarjeta-kpi .valor {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .tarjeta-login {
+        padding: var(--sp-5);
+    }
 }
