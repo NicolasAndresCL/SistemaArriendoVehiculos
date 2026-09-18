@@ -27,6 +27,7 @@ class Configuracion:
 
     api_base_url: str
     storage_secret: str
+    puerto: int
 
 
 def cargar_configuracion() -> Configuracion:
@@ -36,6 +37,11 @@ def cargar_configuracion() -> Configuracion:
         storage_secret=os.getenv(
             "NICEGUI_STORAGE_SECRET", "clave-de-desarrollo-no-usar-en-produccion"
         ),
+        # Configurable para que `scripts/verificar.ps1` levante la interfaz en
+        # un puerto alternativo: el 8080 es también el de Jenkins, y una
+        # instancia ajena escuchando ahí hace pasar (o fallar) la verificación
+        # por motivos que no tienen que ver con el código.
+        puerto=int(os.getenv("FRONTEND_PORT", "8080")),
     )
 
 

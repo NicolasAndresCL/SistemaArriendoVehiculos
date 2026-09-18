@@ -117,6 +117,6 @@ if __name__ in {"__main__", "__mp_main__"}:
         raiz,
         title="Sistema de Arriendo de Vehículos",
         show=False,
-        port=8080,
+        port=configuracion.puerto,
         storage_secret=configuracion.storage_secret,
     )

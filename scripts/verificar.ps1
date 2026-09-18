@@ -1,4 +1,4 @@
-<#
+﻿<#
     .SINOPSIS
     Reproduce en local, en el mismo orden, exactamente lo que corre el CI.
 
@@ -95,6 +95,37 @@ Ejecutar-Paso -Nombre "pytest" -Argumentos @(
 # responden y que el ingreso devuelve un token. Un pipeline que solo lintea da
 # falsa seguridad; los fallos reales aparecen al construir y ejecutar.
 
+function Detener-Arbol {
+    <#
+        Detiene un proceso y TODOS sus descendientes, de las hojas a la raíz.
+
+        NiceGUI arranca con recarga automática y sirve desde un proceso hijo
+        (multiprocessing.spawn) que hereda el socket: matar solo al padre deja
+        a ese hijo escuchando en el puerto, huérfano, y la siguiente
+        verificación se lo encuentra ocupado. Se enumeran todos los procesos
+        una vez y se filtra en PowerShell: en este equipo, un filtro WQL por
+        `ParentProcessId` (o por `ProcessId`) devuelve vacío de forma
+        intermitente aunque el proceso exista, y `taskkill /T` lo bloquea el
+        entorno desde el que suele correr este script.
+    #>
+    param([Parameter(Mandatory = $true)][int]$Raiz)
+
+    $todos = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId
+    $pendientes = @($Raiz)
+    $arbol = @()
+    while ($pendientes.Count -gt 0) {
+        $actual = $pendientes[0]
+        $pendientes = @($pendientes | Select-Object -Skip 1)
+        $arbol += $actual
+        $hijos = $todos | Where-Object { $_.ParentProcessId -eq $actual } | Select-Object -ExpandProperty ProcessId
+        if ($hijos) { $pendientes += @($hijos) }
+    }
+    [array]::Reverse($arbol)
+    foreach ($id in $arbol) {
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Ejecutar-Arranque {
     Write-Host ""
     Write-Host "== arranque del sistema ==" -ForegroundColor Cyan
@@ -120,15 +151,22 @@ function Ejecutar-Arranque {
     $exitoPaso = $false
     Push-Location $raizProyecto
     try {
-        # Si ya hay algo escuchando en el 8080, este paso daría OK sin haber
-        # probado nada: mediría la instancia ajena. Mejor fallar y decirlo.
-        $ocupado = $false
-        try {
-            Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing -TimeoutSec 2 | Out-Null
-            $ocupado = $true
-        } catch { }
-        if ($ocupado) {
-            throw "El puerto 8080 ya está ocupado. Detén esa instancia antes de verificar: si no, este paso mediría la que ya está corriendo en vez de la recién levantada."
+        # Puertos distintos a los de desarrollo (8000/8080): así la comprobación
+        # no choca con una instancia que Nicolás tenga levantada mientras
+        # trabaja, ni con Jenkins, que publica el 8080 por defecto.
+        $puertoApi = 8901
+        $puertoInterfaz = 8902
+        $entornoApi = "http://127.0.0.1:$puertoApi"
+        $entornoInterfaz = "http://127.0.0.1:$puertoInterfaz"
+
+        # Si ya hay algo escuchando en esos puertos, este paso daría OK sin
+        # haber probado nada: mediría la instancia ajena. Se mira el socket y
+        # no una petición HTTP: un servicio que contesta 403 (Jenkins) también
+        # ocupa el puerto, y una petición fallida lo daría por libre.
+        $ocupados = Get-NetTCPConnection -LocalPort $puertoApi, $puertoInterfaz -State Listen -ErrorAction SilentlyContinue
+        if ($ocupados) {
+            $lista = ($ocupados | ForEach-Object { "$($_.LocalPort) (PID $($_.OwningProcess))" } | Sort-Object -Unique) -join ", "
+            throw "Puerto ocupado: $lista. Detén esa instancia antes de verificar: si no, este paso mediría la que ya está corriendo en vez de la recién levantada."
         }
 
         & $python "backend/manage.py" migrate --noinput *>> $logPath
@@ -137,13 +175,11 @@ function Ejecutar-Arranque {
         & $python "backend/manage.py" seed_demo *>> $logPath
         if ($LASTEXITCODE -ne 0) { throw "Falló seed_demo." }
 
-        # Puertos distintos a los de desarrollo: así la comprobación no choca
-        # con una instancia que Nicolás tenga levantada mientras trabaja.
-        $entornoApi = "http://127.0.0.1:8901"
         [System.Environment]::SetEnvironmentVariable("API_BASE_URL", "$entornoApi/api/v1")
+        [System.Environment]::SetEnvironmentVariable("FRONTEND_PORT", "$puertoInterfaz")
 
         $procesos += Start-Process -FilePath $python -PassThru -WindowStyle Hidden `
-            -ArgumentList @("backend/manage.py", "runserver", "8901", "--noreload") `
+            -ArgumentList @("backend/manage.py", "runserver", "$puertoApi", "--noreload") `
             -RedirectStandardOutput (Join-Path $directorioLogs "arranque-backend.log") `
             -RedirectStandardError (Join-Path $directorioLogs "arranque-backend.err")
 
@@ -163,7 +199,7 @@ function Ejecutar-Arranque {
             }
             if (-not $frontendListo) {
                 try {
-                    Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing -TimeoutSec 3 | Out-Null
+                    Invoke-WebRequest -Uri "$entornoInterfaz/" -UseBasicParsing -TimeoutSec 3 | Out-Null
                     $frontendListo = $true
                 } catch { }
             }
@@ -172,7 +208,7 @@ function Ejecutar-Arranque {
         }
 
         if (-not $backendListo) { throw "La API no respondió en ~60 s." }
-        if (-not $frontendListo) { throw "La interfaz no respondió en ~60 s (¿puerto 8080 ocupado?)." }
+        if (-not $frontendListo) { throw "La interfaz no respondió en ~60 s (¿puerto $puertoInterfaz ocupado?)." }
 
         $salud = Invoke-RestMethod -Uri "$entornoApi/healthz/" -TimeoutSec 5
         if ($salud.estado -ne "ok") { throw "healthz no devolvió estado ok." }
@@ -195,12 +231,11 @@ function Ejecutar-Arranque {
         }
     } finally {
         foreach ($proceso in $procesos) {
-            if ($proceso -and -not $proceso.HasExited) {
-                Stop-Process -Id $proceso.Id -Force -ErrorAction SilentlyContinue
-            }
+            if ($proceso) { Detener-Arbol -Raiz $proceso.Id }
         }
         Pop-Location
         [System.Environment]::SetEnvironmentVariable("API_BASE_URL", $null)
+        [System.Environment]::SetEnvironmentVariable("FRONTEND_PORT", $null)
         foreach ($clave in $entornoPrevio.Keys) {
             [System.Environment]::SetEnvironmentVariable($clave, $entornoPrevio[$clave])
         }
