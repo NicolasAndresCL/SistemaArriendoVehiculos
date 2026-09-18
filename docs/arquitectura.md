@@ -266,8 +266,8 @@ flowchart TB
     end
 
     Internet(["Internet"]) --> Ing
-    Ing --> FP
-    FP -->|"NetworkPolicy<br/>permite solo esto"| BP
+    Ing -->|"NetworkPolicy<br/>desde ingress-nginx"| FP
+    FP -->|"NetworkPolicy<br/>HTTP interno, sin TLS"| BP
     BP --> PVC
     Job --> PVC
 ```
@@ -276,8 +276,22 @@ Decisiones y su motivo:
 
 - **Solo la interfaz se expone.** La API queda en `ClusterIP` porque su único
   cliente es el frontend; publicarla ampliaría la superficie sin necesidad.
+- **Denegación por defecto con dos excepciones.** La NetworkPolicy cierra toda
+  entrada a los pods del sistema; se abre solo frontend → backend (8000) y
+  controlador de Ingress → frontend (8080). Sin la segunda regla, el Ingress
+  queda bien declarado pero la interfaz es inalcanzable.
+- **TLS termina en el Ingress.** El tramo frontend → backend es HTTP plano
+  dentro del clúster, por eso `SECURE_HTTPS=False` en el ConfigMap: con la
+  redirección a HTTPS activa, la API respondería 301 al frontend y el ingreso
+  fallaría.
 - **Migraciones en un `Job` aparte.** Con dos réplicas, ponerlas en el arranque
   del contenedor haría que ambos procesos migraran a la vez sobre la misma base.
+  Los estáticos no se recolectan ahí: vienen en la imagen, porque cada pod tiene
+  su propio sistema de archivos y es de solo lectura.
+- **Dos sondas distintas.** `readinessProbe` → `/healthz/` (proceso y base de
+  datos: si la base no responde, el pod deja de recibir tráfico). `livenessProbe`
+  → `/livez/` (solo el proceso: una liveness que dependiera de la base reiniciaría
+  todas las réplicas a la vez cuando el problema no fuera de ellas).
 - **Sesión pegajosa en el Ingress.** NiceGUI mantiene un WebSocket con estado
   en el pod: sin afinidad, la reconexión puede caer en otro pod y perder la sesión.
 

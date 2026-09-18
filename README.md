@@ -199,7 +199,8 @@ Base: `http://localhost:8000/api/v1/`. Autenticación por token de DRF:
 | `POST /reservas/{id}/cancelar/` | Anulación, con `{"motivo"}` opcional |
 | `GET POST /pagos/` | Registro de pagos (sin borrado: un pago se anula, no se elimina) |
 | `GET POST /devoluciones/` | Cierre del arriendo |
-| `GET /healthz/` | Sonda de vida, sin autenticación |
+| `GET /healthz/` | Sonda de disponibilidad: proceso y base de datos. Sin autenticación |
+| `GET /livez/` | Sonda de vida: solo el proceso, **no** toca la base. Sin autenticación |
 
 ### Permisos
 
@@ -241,13 +242,19 @@ Secciones: Panel (indicadores), Usuarios, Vehículos, Reservas, Pagos y Devoluci
 ```
 
 `verificar.ps1` reproduce en local los cuatro trabajos del pipeline: `ruff`, la suite con
-umbral de cobertura, y `check --deploy --fail-level WARNING` contra el settings de
-**producción**. Ese último es el que más se olvida, porque corre con una configuración
-distinta a la de desarrollo y no lo cubre ningún test.
+umbral de cobertura, el **arranque** del sistema completo y `check --deploy --fail-level
+WARNING` contra el settings de **producción**. Ese último es el que más se olvida, porque
+corre con una configuración distinta a la de desarrollo y no lo cubre ningún test.
 
-El pipeline añade un trabajo que verifica que el sistema **arranca**: migra, carga los datos
-de demostración, levanta ambos procesos y comprueba que responden y que el login devuelve un
-token. Un CI que solo pasa un linter da falsa seguridad.
+El paso de arranque migra una base desechable, carga los datos de demostración, levanta
+ambos procesos y comprueba que responden y que el login devuelve un token. Un CI que solo
+pasa un linter da falsa seguridad. Usa los puertos **8901** (API) y **8902** (interfaz), no
+los de desarrollo: así no choca con una instancia que tengas abierta ni con Jenkins, que
+publica el 8080 por defecto. Si alguno está ocupado, el script lo dice y falla en vez de
+medir la instancia ajena.
+
+El puerto de la interfaz se controla con la variable `FRONTEND_PORT` (por defecto 8080),
+tanto al ejecutarla a mano como en Compose.
 
 ---
 
@@ -288,7 +295,7 @@ SistemaArriendoVehiculos/
 | Estáticos | WhiteNoise 6.8.2 (solo en `prod`) |
 | Pruebas | pytest + pytest-django + pytest-cov |
 | Estilo | ruff |
-| Contenedores | Docker (multi-stage) + Compose |
+| Contenedores | Docker (multi-stage, `python:3.13-slim`) + Compose |
 | Orquestación | Kubernetes + Kustomize |
 | Infraestructura | Terraform (~> 1.9) |
 | CI/CD | GitHub Actions · Jenkins (alternativa on-prem) |
@@ -300,16 +307,31 @@ SistemaArriendoVehiculos/
 ```bash
 # Requiere SECRET_KEY y NICEGUI_STORAGE_SECRET en tu .env
 docker compose up --build
+# Si el 8080 está ocupado (Jenkins, por ejemplo):
+FRONTEND_PORT=8082 docker compose up --build
 ```
 
 Levanta tres servicios: `migraciones` (corre una vez y termina), `backend` y
 `frontend`. A diferencia de `iniciar.bat`, esto comprueba que la **imagen de
 producción** arranca de verdad —con `DEBUG=False`, gunicorn y estáticos
-recolectados—, que es justo lo que el arranque de desarrollo no valida.
+servidos por WhiteNoise—, que es justo lo que el arranque de desarrollo no valida.
 
-Las migraciones van en su propio contenedor y no en el arranque del backend:
-con más de una réplica, varios procesos migrando a la vez sobre la misma base
-chocan entre sí.
+Dos decisiones que no son evidentes:
+
+- **Las migraciones van en su propio contenedor** y no en el arranque del backend:
+  con más de una réplica, varios procesos migrando a la vez sobre la misma base
+  chocan entre sí.
+- **Los estáticos se recolectan al construir la imagen**, no al desplegar. Cada
+  contenedor tiene su propio sistema de archivos (y en Kubernetes es de solo
+  lectura): un `collectstatic` en el contenedor de migraciones no llegaría a
+  ningún backend, y `/admin/` respondería 500 por falta del manifiesto de
+  WhiteNoise.
+
+En el clúster, la API solo recibe tráfico interno del frontend por HTTP: TLS
+termina en el Ingress, así que `SECURE_HTTPS` va en `False` en el ConfigMap.
+Con el bloque HTTPS activo, Django respondería 301 a `https://backend:8000` y
+el cliente del frontend lo leería como un error de ingreso. La `livenessProbe`
+apunta a `/livez/` (sin base de datos) y la `readinessProbe` a `/healthz/`.
 
 Para el clúster, ver [`deploy/k8s/`](deploy/k8s/) y la infraestructura previa en
 [`infra/`](infra/). El diseño y los diagramas UML están en

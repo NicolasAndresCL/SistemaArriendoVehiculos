@@ -74,8 +74,24 @@ nada, se reportaba como limpio, y el proceso seguía vivo y sirviendo tráfico.
 
    Si se necesita repetir la prueba pronto, mejor usar puertos distintos a los
    de desarrollo normal (como hace `scripts/verificar.ps1`, que usa `8901` para
-   el backend en vez de `8000`) en vez de reutilizar el mismo puerto sin
-   confirmar que quedó libre.
+   el backend y `8902` para la interfaz vía `FRONTEND_PORT`) en vez de
+   reutilizar el mismo puerto sin confirmar que quedó libre.
+
+   **El 8080 también es el puerto de Jenkins.** Si Docker Desktop está abierto,
+   el contenedor `jenkins` (de `C:\dev\projects\jenkins`) se autoarranca y
+   publica el 8080; NiceGUI no puede escuchar ahí y la verificación falla sin
+   que el log del frontend diga nada. Comprobar el puerto con
+   `Get-NetTCPConnection`, no con una petición HTTP: Jenkins contesta 403 y una
+   petición fallida daría el puerto por libre.
+
+   **Para matar procesos, usar el árbol completo.** El proceso que sirve la
+   interfaz es un hijo (`multiprocessing.spawn`) que hereda el socket: matar
+   solo al padre lo deja huérfano y escuchando. Un filtro WQL por
+   `ParentProcessId` devuelve vacío de forma intermitente en este equipo (igual
+   que por `ProcessId`), y `taskkill /T` lo bloquea el entorno de Claude Code.
+   Lo que funciona: enumerar `Get-CimInstance Win32_Process` sin filtro y
+   recorrer los descendientes en PowerShell, como hace `Detener-Arbol` en
+   `scripts/verificar.ps1`.
 
 4. **Nunca usar `nohup ... &` de Bash para levantar backend/frontend cuando la
    verificación final la hace un navegador real (Playwright u otro).** El

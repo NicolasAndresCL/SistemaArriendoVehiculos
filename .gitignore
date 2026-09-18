@@ -44,3 +44,6 @@ tfplan
 
 # Artefactos de pruebas con navegador
 .playwright-mcp/
+
+# Lecciones por tecnología (documento personal, no es documentación del proyecto)
+aprendizaje.md
