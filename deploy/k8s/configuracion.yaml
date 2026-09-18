@@ -9,7 +9,12 @@ data:
   DATABASE_URL: sqlite:////app/datos/db.sqlite3
   ALLOWED_HOSTS: arriendos.example.cl,backend
   CSRF_TRUSTED_ORIGINS: https://arriendos.example.cl
-  SECURE_HTTPS: "True"
+  # TLS termina en el Ingress y la API solo recibe tráfico interno del
+  # frontend por HTTP plano, sin cabecera X-Forwarded-Proto. Con el bloque
+  # HTTPS activo, Django respondería 301 a https://backend:8000 y el cliente
+  # httpx del frontend (que no sigue redirecciones) lo leería como error: el
+  # ingreso fallaría con "error inesperado al comunicarse con la API".
+  SECURE_HTTPS: "False"
   # La interfaz llega a la API por el nombre del Service, no por localhost:
   # son pods distintos.
   API_BASE_URL: http://backend:8000/api/v1
@@ -44,6 +49,9 @@ spec:
 # Migraciones como Job propio, no en el arranque de cada réplica: con dos pods
 # de backend, ambos correrían `migrate` a la vez sobre la misma base.
 # El pipeline espera a que este Job termine antes de rotar los Deployments.
+# Sin `collectstatic`: los estáticos vienen en la imagen. Este pod tiene el
+# sistema de archivos de solo lectura y, aunque pudiera escribir, ningún
+# backend vería lo que recolectara aquí.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -66,7 +74,6 @@ spec:
             - -c
             - |
               python backend/manage.py migrate --noinput
-              python backend/manage.py collectstatic --noinput
           envFrom:
             - configMapRef: { name: arriendos-config }
             - secretRef: { name: arriendos-secretos }
@@ -113,3 +120,23 @@ spec:
             matchLabels: { app: arriendos, componente: frontend }
       ports:
         - { protocol: TCP, port: 8000 }
+---
+# El controlador de Ingress vive en otro namespace: sin esta regla, la
+# política de denegación por defecto también le cierra el paso y la interfaz
+# queda inalcanzable desde fuera aunque el Ingress esté bien declarado.
+# El selector usa la etiqueta `kubernetes.io/metadata.name`, que el propio
+# clúster pone en todo namespace desde la versión 1.21.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: permitir-ingress-a-frontend
+spec:
+  podSelector:
+    matchLabels: { app: arriendos, componente: frontend }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+      ports:
+        - { protocol: TCP, port: 8080 }

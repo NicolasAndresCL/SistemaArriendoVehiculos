@@ -72,7 +72,11 @@ resource "kubernetes_config_map" "arriendos" {
     DATABASE_URL           = "sqlite:////app/datos/db.sqlite3"
     ALLOWED_HOSTS          = "${var.host_publico},backend"
     CSRF_TRUSTED_ORIGINS   = "https://${var.host_publico}"
-    SECURE_HTTPS           = "True"
+    # TLS termina en el Ingress; la API solo recibe HTTP interno del frontend,
+    # sin X-Forwarded-Proto. Con el bloque HTTPS activo respondería 301 a
+    # https://backend:8000 y el cliente del frontend lo leería como error.
+    # Debe coincidir con deploy/k8s/configuracion.yaml.
+    SECURE_HTTPS           = "False"
     API_BASE_URL           = "http://backend:8000/api/v1"
   }
 }

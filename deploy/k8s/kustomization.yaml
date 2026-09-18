@@ -19,9 +19,15 @@ resources:
   - frontend.yaml
   - ingress.yaml
 
-commonLabels:
-  app.kubernetes.io/name: sistema-arriendo
-  app.kubernetes.io/managed-by: kustomize
+# `labels` reemplaza a `commonLabels`, deprecado en Kustomize 5. Con
+# `includeSelectors: false` las etiquetas van a los objetos pero NO a los
+# selectores de Deployment y Service, que son inmutables y deben depender solo
+# de `app` y `componente`.
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/name: sistema-arriendo
+      app.kubernetes.io/managed-by: kustomize
 
 images:
   - name: sistema-arriendo
