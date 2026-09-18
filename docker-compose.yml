@@ -7,6 +7,7 @@
 #
 #   docker compose up --build
 #   → interfaz en http://localhost:8080 · API en http://localhost:8000
+#   (si el 8080 está ocupado: FRONTEND_PORT=8082 docker compose up --build)
 #
 # La base es SQLite sobre un volumen, como pide el enunciado. El código lee
 # `DATABASE_URL` con django-environ, así que migrar a PostgreSQL es cambiar
@@ -29,14 +30,15 @@ x-imagen-comun: &imagen-comun
     - datos:/app/datos
 
 services:
-  # Las migraciones y la recolección de estáticos corren UNA vez, en su propio
-  # contenedor, antes de que arranque nadie más. Meterlas en el arranque del
-  # backend haría que varias réplicas migraran en paralelo sobre la misma base.
+  # Las migraciones corren UNA vez, en su propio contenedor, antes de que
+  # arranque nadie más. Meterlas en el arranque del backend haría que varias
+  # réplicas migraran en paralelo sobre la misma base. Los estáticos NO se
+  # recolectan aquí: ya vienen en la imagen (ver Dockerfile), porque este
+  # contenedor no comparte sistema de archivos con el del backend.
   migraciones:
     <<: *imagen-comun
     command: >
       sh -c "python backend/manage.py migrate --noinput &&
-             python backend/manage.py collectstatic --noinput &&
              python backend/manage.py seed_demo"
     restart: "no"
 
@@ -67,7 +69,10 @@ services:
       NICEGUI_STORAGE_SECRET: ${NICEGUI_STORAGE_SECRET:?define NICEGUI_STORAGE_SECRET en tu .env}
     command: ["python", "frontend/main.py"]
     ports:
-      - "8080:8080"
+      # El puerto del host es configurable porque el 8080 es también el de
+      # Jenkins: `FRONTEND_PORT=8082 docker compose up` deja la interfaz en
+      # http://localhost:8082 sin tocar nada más.
+      - "${FRONTEND_PORT:-8080}:8080"
     # Para la interfaz, "sano" es servir su propia página: el healthcheck de
     # la imagen apunta a /healthz/ del backend, que aquí no corresponde.
     healthcheck:

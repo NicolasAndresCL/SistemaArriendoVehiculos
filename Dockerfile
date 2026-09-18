@@ -8,7 +8,9 @@
 # importa.
 
 # ---------------------------------------------------------------- build
-FROM python:3.12-slim AS builder
+# La misma versión de Python que el CI (.github/workflows/ci.yml): una imagen
+# con otro intérprete no representa el entorno que los tests validaron.
+FROM python:3.13-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -24,7 +26,7 @@ RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install -r requirements.txt
 
 # ---------------------------------------------------------------- runtime
-FROM python:3.12-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -46,11 +48,20 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=arriendos:arriendos . .
 
-# `datos` guarda la base SQLite; `staticfiles`, lo que recolecte collectstatic.
-RUN mkdir -p /app/datos /app/staticfiles \
-    && chown -R arriendos:arriendos /app/datos /app/staticfiles
+# `datos` guarda la base SQLite; en Compose y Kubernetes se monta un volumen
+# encima.
+RUN mkdir -p /app/datos && chown arriendos:arriendos /app/datos
 
 USER arriendos
+
+# Los estáticos se recolectan AQUÍ, en el build, y no al desplegar: los pods
+# corren con el sistema de archivos de solo lectura y cada réplica tiene el
+# suyo, así que un `collectstatic` en el Job de migraciones fallaría al
+# escribir y, aunque no fallara, no llegaría a ningún backend. `STATIC_ROOT`
+# es `backend/staticfiles` (BASE_DIR apunta a `backend/`). No toca la base de
+# datos; las variables están solo para que el settings de producción importe.
+RUN SECRET_KEY=solo-para-collectstatic ALLOWED_HOSTS=localhost \
+    python backend/manage.py collectstatic --noinput
 
 # 8000 backend · 8080 frontend. Se documentan ambos porque la misma imagen
 # sirve para los dos servicios según el comando que reciba.

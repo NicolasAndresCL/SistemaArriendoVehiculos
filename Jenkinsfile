@@ -9,8 +9,9 @@ pipeline {
     // Agente Docker efímero: el build de hoy corre en el mismo entorno limpio
     // que el de mañana. Un agente persistente acumula estado y produce el
     // clásico "funciona en mi agente".
+    // Misma versión que el CI de GitHub Actions y que el Dockerfile.
     agent {
-        docker { image 'python:3.12-slim' }
+        docker { image 'python:3.13-slim' }
     }
 
     options {
