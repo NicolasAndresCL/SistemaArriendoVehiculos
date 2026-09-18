@@ -49,11 +49,11 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
           # liveness: ¿está colgado sin remedio? Si falla, se REINICIA el pod.
-          # Apunta al mismo endpoint pero con umbrales mucho más laxos: una
-          # liveness sensible a la base de datos reiniciaría todas las réplicas
-          # a la vez cuando el problema no es de ellas.
+          # Apunta a /livez/, que NO consulta la base de datos: una liveness
+          # sensible a la base reiniciaría todas las réplicas a la vez cuando
+          # el problema no es de ellas. Umbrales laxos por la misma razón.
           livenessProbe:
-            httpGet: { path: /healthz/, port: http }
+            httpGet: { path: /livez/, port: http }
             initialDelaySeconds: 30
             periodSeconds: 20
             failureThreshold: 5

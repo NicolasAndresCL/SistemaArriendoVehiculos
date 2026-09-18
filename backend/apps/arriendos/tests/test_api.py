@@ -20,3 +20,11 @@ def test_healthz_responde_ok_sin_autenticacion(cliente_api_anonimo):
     respuesta = cliente_api_anonimo.get("/healthz/")
     assert respuesta.status_code == 200
     assert respuesta.data["estado"] == "ok"
+    assert respuesta.data["base_de_datos"] == "ok"
+
+
+def test_livez_responde_sin_tocar_la_base_de_datos(cliente_api_anonimo):
+    """Sin `django_db`: si la vista consultara la base, pytest-django lo bloquea."""
+    respuesta = cliente_api_anonimo.get("/livez/")
+    assert respuesta.status_code == 200
+    assert respuesta.data == {"estado": "ok"}

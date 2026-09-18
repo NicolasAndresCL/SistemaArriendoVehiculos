@@ -11,12 +11,28 @@ from rest_framework.response import Response
 @authentication_classes([])
 @permission_classes([AllowAny])
 def salud(request: Request) -> Response:
-    """Sonda de vida: confirma que el proceso responde y que la BD contesta.
+    """Sonda de disponibilidad: el proceso responde y la base de datos contesta.
 
-    El job de arranque del CI la consulta para verificar que el sistema no solo
-    compila, sino que levanta de verdad.
+    La consultan el job de arranque del CI (para verificar que el sistema no
+    solo compila, sino que levanta de verdad), el HEALTHCHECK de la imagen y la
+    ``readinessProbe`` de Kubernetes: si la base no responde, el pod deja de
+    recibir tráfico pero sigue vivo.
     """
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1")
         cursor.fetchone()
     return Response({"estado": "ok", "base_de_datos": "ok"})
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def vivo(request: Request) -> Response:
+    """Sonda de vida: solo confirma que el proceso atiende peticiones.
+
+    Es la que consume la ``livenessProbe`` de Kubernetes, y a propósito NO toca
+    la base de datos: una liveness que dependiera de ella reiniciaría todas las
+    réplicas a la vez cuando el problema no fuera de ellas, convirtiendo una
+    avería externa en un apagón propio.
+    """
+    return Response({"estado": "ok"})
